@@ -19,13 +19,20 @@ while ((line != null && line != undefined) && (line.indexOf('\xFF') == -1)){\n\x
 
 line = ""
 fileName = ""
+dataReceived = None
 def uart_data_received(sender, data):
     try:
         global line
+        global dataReceived
         line = line + str(data, 'utf-8')
+        if(data != '' and data != None):
+            dataReceived = datetime.now()
+
     except:
         e = sys.exc_info()[0]
         print("Error on data receieved: " + str(e) )
+    finally:
+        global loop
 
 # You can scan for devices with:
 async def discover_coroutine():
@@ -47,15 +54,25 @@ async def command_coroutine(address, loop):
         while len(c)>0:
           await client.write_gatt_char(UUID_NORDIC_TX, bytearray(c[0:20]), True)
           c = c[20:]
-        await asyncio.sleep(240.0, loop=loop) # wait for a response
+
+        global dataReceived
+        await asyncio.sleep(10.0, loop=loop) # wait for a response
+        lastDataReceivedDelta = datetime.now() - dataReceived
+        print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
+        while (lastDataReceivedDelta.seconds < 10):
+            await asyncio.sleep(10.0, loop=loop) # wait for a response
+            lastDataReceivedDelta = datetime.now() - dataReceived
+            print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
+
+
         await client.disconnect()
         print("\r\n\r\nDone!")
         now = datetime.now()
         global fileName
-        fileName = "ftclog" + now.strftime("%Y-%m-%d-%H-%M-%S")#-%Y-%m-%d-%H-%M-%S"
-        f = open(fileName, 'w')
+        fileName = "ftclog-" + now.strftime("%Y-%m-%d-%H-%M-%S")#-%Y-%m-%d-%H-%M-%S" 
+        f = open(fileName + ".csv", 'w')
         f.write(line)
-        print(line)
+        #print(line)
 
 try:
     loop = asyncio.get_event_loop()
