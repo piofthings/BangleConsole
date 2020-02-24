@@ -16,9 +16,8 @@ while ((line != null && line != undefined) && (line.indexOf('\xFF') == -1)){\n\x
   print(line);\n\x10\
 }\n\x10\
 "
-deleteFileCommand = b"\x03\x10\var f = require('Storage').open('ftclog', 'w');\n\x10\
- f.erase();\n\x10\
- E.reboot();\n\x10"
+deleteFileCommand = b"\x03\x10\
+Bangle.AppLog.clearLog();\n\x10"
 
 line = ""
 fileName = ""
@@ -66,8 +65,6 @@ async def getFile_coroutine(address, loop):
             await asyncio.sleep(10.0, loop=loop) # wait for a response
             lastDataReceivedDelta = datetime.now() - dataReceived
             print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
-
-
         
         now = datetime.now()
         global fileName
@@ -79,11 +76,21 @@ async def getFile_coroutine(address, loop):
 async def deleteFile_coroutine(address, loop):
     async with BleakClient(address, loop) as client:
         print("Deleting file")
+        await client.start_notify(UUID_NORDIC_RX, uart_data_received)
         c=deleteFileCommand
         while len(c)>0:
             await client.write_gatt_char(UUID_NORDIC_TX, bytearray(c[0:20]), True)
             c = c[20:]
-        ## Never quiet gets here
+
+        global dataReceived
+        await asyncio.sleep(5.0, loop=loop) # wait for a response
+        lastDataReceivedDelta = datetime.now() - dataReceived
+        print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
+        while (lastDataReceivedDelta.seconds < 5):
+            await asyncio.sleep(10.0, loop=loop) # wait for a response
+            lastDataReceivedDelta = datetime.now() - dataReceived
+            print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
+
         print("\r\n\r\nDisconnecting from Bangle !")
         await client.disconnect()
         print("\r\n\r\nDone!")
@@ -91,6 +98,7 @@ try:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(discover_coroutine())
     loop.run_until_complete(getFile_coroutine(address, loop))
+    dataReceived = datetime.now()
     loop.run_until_complete(deleteFile_coroutine(address, loop))
 finally:
     print("finally!")
