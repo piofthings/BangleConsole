@@ -58,7 +58,8 @@ async def getFile_coroutine(address, loop):
           c = c[20:]
 
         global dataReceived
-        await asyncio.sleep(10.0, loop=loop) # wait for a response
+        await asyncio.sleep(30.0, loop=loop) # wait for a response
+        dataReceived = datetime.now()
         lastDataReceivedDelta = datetime.now() - dataReceived
         print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
         while (lastDataReceivedDelta.seconds < 10):
@@ -83,6 +84,7 @@ async def deleteFile_coroutine(address, loop):
             c = c[20:]
 
         global dataReceived
+
         await asyncio.sleep(5.0, loop=loop) # wait for a response
         lastDataReceivedDelta = datetime.now() - dataReceived
         print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
@@ -97,8 +99,9 @@ async def deleteFile_coroutine(address, loop):
 try:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(discover_coroutine())
+    dataReceived = datetime.now()
     loop.run_until_complete(getFile_coroutine(address, loop))
     dataReceived = datetime.now()
-    loop.run_until_complete(deleteFile_coroutine(address, loop))
+    #loop.run_until_complete(deleteFile_coroutine(address, loop))
 finally:
     print("finally!")
