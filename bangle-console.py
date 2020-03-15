@@ -9,12 +9,7 @@ address = "0DB07D6F-8F0F-4CB3-A801-0D9A868BE7CE"
 UUID_NORDIC_TX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 UUID_NORDIC_RX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 getFileCommand = b"\x03\x10\
-var f = require('Storage').open('ftclog', 'r');\n\x10\
-var line = '';\n\x10\
-while ((line != null && line != undefined) && (line.indexOf('\xFF') == -1)){\n\x10\
-  line = f.readLine();\n\x10\
-  print(line);\n\x10\
-}\n\x10\
+Bangle.AppLog.beginSync();\n\x10\
 "
 deleteFileCommand = b"\x03\x10\
 Bangle.AppLog.clearLog();\n\x10"
@@ -22,12 +17,16 @@ Bangle.AppLog.clearLog();\n\x10"
 line = ""
 fileName = ""
 dataReceived = None
+transferTimeout = 10
+foundBangle = False
+
 def uart_data_received(sender, data):
     try:
         global line
         global dataReceived
-        line = line + str(data, 'utf-8')
-        if(data != '' and data != None):
+        if(data !="<!-- finished sync -->"):
+            line = line + str(data, 'utf-8')
+        if(data != '' and data != None and data !="<!-- finished sync -->"):
             dataReceived = datetime.now()
 
     except:
@@ -40,8 +39,14 @@ def uart_data_received(sender, data):
 async def discover_coroutine():
     try:
         devices = await discover()
+        global address
+        global foundBangle
         for d in devices:
-            print(d)
+            if(address in str(d)):
+                foundBangle = True
+                print("Found Bangle")
+                break
+        
 
     finally:
         print("Done discover")
@@ -62,8 +67,8 @@ async def getFile_coroutine(address, loop):
         dataReceived = datetime.now()
         lastDataReceivedDelta = datetime.now() - dataReceived
         print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
-        while (lastDataReceivedDelta.seconds < 10):
-            await asyncio.sleep(10.0, loop=loop) # wait for a response
+        while (lastDataReceivedDelta.seconds < transferTimeout):
+            await asyncio.sleep(transferTimeout, loop=loop) # wait for a response
             lastDataReceivedDelta = datetime.now() - dataReceived
             print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
         
@@ -93,15 +98,21 @@ async def deleteFile_coroutine(address, loop):
             lastDataReceivedDelta = datetime.now() - dataReceived
             print("Data last recieved: " + str(dataReceived) + " Delta:" + str(lastDataReceivedDelta.seconds))
 
+async def disconnect_bangle(address, loop):
+    async with BleakClient(address, loop) as client:
         print("\r\n\r\nDisconnecting from Bangle !")
         await client.disconnect()
         print("\r\n\r\nDone!")
+       
 try:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(discover_coroutine())
-    dataReceived = datetime.now()
-    loop.run_until_complete(getFile_coroutine(address, loop))
-    dataReceived = datetime.now()
-    #loop.run_until_complete(deleteFile_coroutine(address, loop))
+    if(foundBangle):
+        dataReceived = datetime.now()
+        loop.run_until_complete(getFile_coroutine(address, loop))
+        dataReceived = datetime.now()
+        #loop.run_until_complete(deleteFile_coroutine(address, loop))
+        loop.run_until_complete(disconnect_bangle(address, loop))
+
 finally:
-    print("finally!")
+    print("Bye!")
